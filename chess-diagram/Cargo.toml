@@ -38,6 +38,7 @@ uci.workspace = true
 
 ucui-engine = { path = "../engine" }
 ucui-eco = { path = "../eco" }
+ucui-utils = { path = "../utils" }
 
 
 

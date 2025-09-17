@@ -435,6 +435,7 @@ dependencies = [
  "uci",
  "ucui-eco",
  "ucui-engine",
+ "ucui-utils",
  "wasm-bindgen-futures",
  "web-sys",
 ]

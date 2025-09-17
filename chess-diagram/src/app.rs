@@ -153,7 +153,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
                                 .legal_moves()
                                 .iter()
                                 .filter(|m| {
-                                    m.to() == state.to()
+                                    ucui_utils::move_classic_to(m) == state.to()
                                         && m.from() == Some(state.from())
                                         && state.promotion().comp_move(m.promotion())
                                 })
