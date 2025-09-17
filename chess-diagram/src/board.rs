@@ -243,6 +243,31 @@ pub fn file_from_index(index: usize) -> File {
         _ => panic!("file out of range {index}"),
     }
 }
+pub fn rank_to_index(rank: Rank) -> usize {
+    match rank {
+        Rank::Eighth => 0,
+        Rank::Seventh => 1,
+        Rank::Sixth => 2,
+        Rank::Fifth => 3,
+        Rank::Fourth => 4,
+        Rank::Third => 5,
+        Rank::Second => 6,
+        Rank::First => 7,
+    }
+}
+
+pub fn file_to_index(file: File) -> usize {
+    match file {
+        File::A => 0,
+        File::B => 1,
+        File::C => 2,
+        File::D => 3,
+        File::E => 4,
+        File::F => 5,
+        File::G => 6,
+        File::H => 7,
+    }
+}
 
 pub fn square_at(container_rect: &Rect, pos: Pos2) -> Option<Square> {
     let board_rect = board_rect(container_rect);

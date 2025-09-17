@@ -5,6 +5,7 @@ mod board;
 mod config;
 mod game;
 mod gesture;
+mod promotion;
 mod proxy;
 mod side;
 mod sources;

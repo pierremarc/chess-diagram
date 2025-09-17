@@ -1,6 +1,6 @@
 use egui::Pos2;
 use log::info;
-use shakmaty::{Piece, Square};
+use shakmaty::{Piece, Rank, Role, Square};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct StateStart {
@@ -21,7 +21,6 @@ pub struct StateMoving {
     position: Pos2,
     from: Square,
     piece: Piece,
-    // to: Option<Square>,
 }
 
 impl StateMoving {
@@ -52,11 +51,31 @@ impl StateMoving {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum Promotion {
+    NotApplicable,
+    None,
+    Role(Role),
+}
+
+impl Promotion {
+    pub fn comp_move(&self, opt_role: Option<Role>) -> bool {
+        match (self, opt_role) {
+            (Promotion::NotApplicable, _) => true,
+            (Promotion::None, None) => true,
+            (Promotion::None, Some(_)) => false,
+            (Promotion::Role(_), None) => false,
+            (Promotion::Role(self_role), Some(role)) => *self_role == role,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct StateEnd {
     // position: Pos2,
     from: Square,
     piece: Piece,
     to: Square,
+    promotion: Promotion,
 }
 
 impl StateEnd {
@@ -67,19 +86,34 @@ impl StateEnd {
             from,
             piece,
         }: StateMoving,
+        promotion: Promotion,
     ) -> Self {
-        Self { from, piece, to }
+        Self {
+            from,
+            piece,
+            to,
+            promotion,
+        }
     }
 
     pub fn piece(&self) -> Piece {
         self.piece
     }
+
     pub fn from(&self) -> Square {
         self.from
     }
 
     pub fn to(&self) -> Square {
         self.to
+    }
+
+    pub fn promotion(&self) -> Promotion {
+        self.promotion
+    }
+
+    pub fn promote(&mut self, role: Role) {
+        self.promotion = Promotion::Role(role);
     }
 }
 
@@ -109,10 +143,32 @@ impl Gesture {
     }
 
     pub fn end(&self, to: Square) -> Self {
-        info!("Gesture#end {self:?} {to:?}");
+        info!("Gesture#end {:?} {}", self, to);
         match self {
-            Gesture::Moving(state) => Gesture::End(StateEnd::from_moving(to, *state)),
+            Gesture::Moving(state) => {
+                if state.piece().role == Role::Pawn
+                    && (to.rank() == Rank::First || to.rank() == Rank::Eighth)
+                {
+                    Gesture::End(StateEnd::from_moving(to, *state, Promotion::None))
+                } else {
+                    Gesture::End(StateEnd::from_moving(to, *state, Promotion::NotApplicable))
+                }
+            }
             _ => *self,
+        }
+    }
+
+    pub fn promote(&mut self, role: Role) {
+        if let Gesture::End(state) = self {
+            state.promotion = Promotion::Role(role);
+        }
+    }
+
+    pub fn need_promotion(&self) -> bool {
+        if let Gesture::End(state) = self {
+            state.promotion == Promotion::None
+        } else {
+            false
         }
     }
 }

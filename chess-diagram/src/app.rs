@@ -8,13 +8,14 @@ use egui::Key;
 use egui_extras::install_image_loaders;
 use log::info;
 use shakmaty::fen::Fen;
-use shakmaty::{Chess, Position};
+use shakmaty::{Chess, Move, Position};
 use shakmaty_uci::{ParseUciMoveError, UciMove};
 
 use crate::board::{render_board, square_at};
 use crate::config::get_engine_color;
 use crate::game::GameState;
 use crate::gesture::Gesture;
+use crate::promotion::render_promotion;
 use crate::proxy::{Proxy, start_engine};
 use crate::side::render_side;
 use crate::sources::Sources;
@@ -128,32 +129,39 @@ impl<'a> eframe::App for DiagramApp<'a> {
                         &gesture,
                         &game_state.game,
                         game_state.moves.last(),
-                        // game_state.opening.clone(),
                     );
+                }
+                {
+                    let mut gesture = gesture.borrow_mut();
+                    if gesture.need_promotion() {
+                        render_promotion(ctx, ui, &self.sources, &mut gesture);
+                        return;
+                    }
                 }
 
                 let (move_, is_end) = {
                     let gesture = self.gesture.borrow();
                     let game_state = self.game.read().unwrap();
+                    let turn = game_state.game.turn();
 
                     if let Gesture::End(state) = *gesture {
-                        let uci_string = format!("{}{}", state.from(), state.to());
-                        info!("END {uci_string}");
-                        (
-                            UciMove::from_str(&uci_string)
-                                .and_then(|uci_move| {
-                                    uci_move.to_move(&game_state.game).map_err(|_err| {
-                                        info!("Not a move {_err}");
-                                        ParseUciMoveError
-                                    })
+                        if turn != state.piece().color {
+                            (None, false)
+                        } else {
+                            let moves_: Vec<Move> = game_state
+                                .game
+                                .legal_moves()
+                                .iter()
+                                .filter(|m| {
+                                    m.to() == state.to()
+                                        && m.from() == Some(state.from())
+                                        && state.promotion().comp_move(m.promotion())
                                 })
-                                .map_err(|err| {
-                                    info!("Not a move 2 {err}");
-                                    err
-                                })
-                                .ok(),
-                            true,
-                        )
+                                .map(|m| m.clone())
+                                .collect();
+
+                            (moves_.first().cloned(), true)
+                        }
                     } else {
                         (None, false)
                     }
