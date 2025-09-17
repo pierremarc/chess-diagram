@@ -92,3 +92,8 @@ pub fn lookup_eco_from_code(pat: &str) -> Vec<Eco> {
         .cloned()
         .collect()
 }
+
+pub fn get_openings_table() -> Vec<Eco> {
+    let table = ECO_TABLE.get_or_init(init_table);
+    table.values().cloned().collect()
+}

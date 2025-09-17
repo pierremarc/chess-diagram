@@ -25,6 +25,10 @@ pub struct Config {
     )]
     engine_color: Color,
 
+    /// Engine color
+    #[arg(long, value_name = "ENGINE DEPTH", default_value = "16")]
+    engine_depth: u8,
+
     /// UCI option
     ///
     /// This argument can be repeated. UCI options are of the
@@ -72,6 +76,9 @@ pub fn get_engine_args() -> Option<Vec<String>> {
 
 pub fn get_engine_color() -> Color {
     config().engine_color.clone()
+}
+pub fn get_engine_depth() -> u8 {
+    config().engine_depth
 }
 
 pub fn get_engine_options() -> Vec<(String, Option<String>)> {

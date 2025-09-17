@@ -2,7 +2,9 @@ use std::{collections::HashMap, str::FromStr};
 
 use rand::seq::IndexedRandom;
 use shakmaty::{Chess, Color, FromSetup, Move, Position, fen::Fen};
-use ucui_eco::{lookup_eco_from_code, lookup_eco_from_name};
+use ucui_eco::{
+    find_eco_from_moves, get_openings_table, lookup_eco_from_code, lookup_eco_from_name,
+};
 
 use crate::config::{get_eco_codes, get_opening};
 
@@ -33,11 +35,7 @@ impl GameState {
     pub fn make_move(&mut self, move_: Move) {
         if let Ok(new_game) = self.game.clone().play(&move_) {
             self.moves.push(move_.clone());
-            if let Some((_, opening)) = self.openings.find_move(&new_game) {
-                self.opening = Some(opening.clone());
-            } else {
-                self.opening = None;
-            }
+            self.opening = find_eco_from_moves(&self.moves).map(|eco| eco.name.clone());
             self.game = new_game;
         };
     }
@@ -53,12 +51,15 @@ impl Openings {
     fn new() -> Self {
         let variants = if let Some(opening) = get_opening() {
             lookup_eco_from_name(&opening)
-        } else {
+        } else if get_eco_codes().len() > 0 {
             let mut variants = Vec::new();
             for eco in get_eco_codes() {
                 variants.extend(lookup_eco_from_code(&eco));
             }
             variants
+        } else {
+            // everything?
+            get_openings_table()
         };
 
         let mut index = HashMap::<Fen, OpeningItem>::new();
@@ -69,15 +70,17 @@ impl Openings {
             for mi in 0..moves_max {
                 let fen = Fen::from_position(game.clone(), shakmaty::EnPassantMode::Legal);
                 let move_: Move = variant.moves[mi].clone().into();
-                game = game.play(&move_).expect("illegal move from openings table");
-                let movelist = if let Some((current, _)) = index.get(&fen) {
-                    let mut updated = current.clone();
-                    updated.push(move_);
-                    updated
-                } else {
-                    vec![move_]
-                };
-                let _ = index.insert(fen, (movelist, variant.name.clone()));
+                if game.is_legal(&move_) {
+                    game = game.play(&move_).expect("illegal move from openings table");
+                    let movelist = if let Some((current, _)) = index.get(&fen) {
+                        let mut updated = current.clone();
+                        updated.push(move_);
+                        updated
+                    } else {
+                        vec![move_]
+                    };
+                    let _ = index.insert(fen, (movelist, variant.name.clone()));
+                }
             }
         }
 

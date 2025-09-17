@@ -31,7 +31,7 @@ pub fn render_board(
     gesture: &Gesture,
     game: &Chess,
     last_move: Option<&Move>,
-    // opening: Option<String>,
+    title: Option<String>,
 ) {
     // let mut state = ss_main.borrow_mut();
     let lid = ui.layer_id();
@@ -43,6 +43,18 @@ pub fn render_board(
 
     // backround
     let _ = painter.rect_filled(rect, CornerRadius::ZERO, Color32::WHITE);
+
+    // title
+    title.map(|title| {
+        let pos = pos2(
+            board_rect.min.x + board_rect.width() / 2.0,
+            rect.min.y + MARGIN / 3.0,
+        );
+        let align = Align2::CENTER_TOP;
+        let font = FontId::proportional(16.0);
+        let color = Color32::BLACK;
+        let _ = painter.text(pos, align, title, font, color);
+    });
 
     // frame
     let _ = painter.rect_stroke(

@@ -6,13 +6,12 @@ use std::{
     thread::spawn,
 };
 
-use chrono::Duration;
 use egui::Context;
-use shakmaty::{Move, Position};
+use shakmaty::Move;
 use ucui_engine::{EngineCommand, EngineMessage, connect_engine};
 
 use crate::{
-    config::{get_engine, get_engine_args, get_engine_options},
+    config::{get_engine, get_engine_args, get_engine_depth, get_engine_options},
     game::GameState,
 };
 
@@ -39,12 +38,11 @@ impl Proxy {
         self.tx.send(EngineCommand::Stop).expect("Err proxy stop ");
     }
 
-    pub fn play(&self, fen: String, white_time: Duration, black_time: Duration) {
+    pub fn play(&self, fen: String) {
         self.tx
             .send(EngineCommand::Go {
                 fen,
-                white_time,
-                black_time,
+                depth: get_engine_depth(),
             })
             .expect("Err proxy play ");
     }
@@ -59,12 +57,8 @@ pub fn start_engine(state: Arc<RwLock<GameState>>, ctx: Arc<Mutex<Context>>) -> 
                 match command {
                     EngineCommand::NewGame => engine.new_game(),
                     EngineCommand::Stop => engine.stop(),
-                    EngineCommand::Go {
-                        fen,
-                        white_time,
-                        black_time,
-                    } => {
-                        engine.go(fen, white_time, black_time);
+                    EngineCommand::Go { fen, depth } => {
+                        engine.go(fen, depth);
 
                         if let Ok(EngineMessage::BestMove { move_, score: _ }) = engine.recv() {
                             let move_: Move = move_.into();

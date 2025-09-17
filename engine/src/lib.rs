@@ -1,6 +1,5 @@
 use std::sync::mpsc::RecvError;
 
-use chrono::Duration;
 use serde::{Deserialize, Serialize};
 use shakmaty::Move;
 use shakmaty_uci::UciInfo;
@@ -15,14 +14,17 @@ pub enum EngineState {
     Move(Move),
 }
 
+// #[derive(Serialize, Deserialize)]
+// pub enum EngineGoArg {
+//     MoveTime(Duration),
+//     LeftTime(Duration),
+//     Depth(usize),
+// }
+
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "_tag")]
 pub enum EngineCommand {
-    Go {
-        fen: String,
-        white_time: Duration,
-        black_time: Duration,
-    },
+    Go { fen: String, depth: u8 },
     NewGame,
     Stop,
 }
@@ -66,7 +68,7 @@ pub trait Engine {
     fn name(&self) -> String;
     fn new_game(&self) {}
     fn stop(&self) {}
-    fn go(&self, fen: String, white_time: Duration, black_time: Duration);
+    fn go(&self, fen: String, depth: u8);
     fn recv(&self) -> Result<EngineMessage, RecvError>;
 }
 

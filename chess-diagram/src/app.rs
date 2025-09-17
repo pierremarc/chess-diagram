@@ -1,15 +1,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::str::FromStr;
 use std::sync::{Arc, Mutex, RwLock};
 
-use chrono::Duration;
 use egui::Key;
 use egui_extras::install_image_loaders;
 use log::info;
 use shakmaty::fen::Fen;
 use shakmaty::{Chess, Move, Position};
-use shakmaty_uci::{ParseUciMoveError, UciMove};
 
 use crate::board::{render_board, square_at};
 use crate::config::get_engine_color;
@@ -17,7 +14,6 @@ use crate::game::GameState;
 use crate::gesture::Gesture;
 use crate::promotion::render_promotion;
 use crate::proxy::{Proxy, start_engine};
-use crate::side::render_side;
 use crate::sources::Sources;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -81,8 +77,6 @@ impl<'a> DiagramApp<'a> {
                     self.engine.play(
                         Fen::from_position(game_state.game.clone(), shakmaty::EnPassantMode::Legal)
                             .to_string(),
-                        Duration::milliseconds(3000),
-                        Duration::milliseconds(3000),
                     );
                 }
             }
@@ -122,6 +116,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
                 {
                     let gesture = gesture.borrow();
                     let game_state = game_state.read().unwrap();
+                    let title = game_state.opening.clone();
                     render_board(
                         ctx,
                         ui,
@@ -129,6 +124,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
                         &gesture,
                         &game_state.game,
                         game_state.moves.last(),
+                        title,
                     );
                 }
                 {
@@ -190,8 +186,6 @@ impl<'a> eframe::App for DiagramApp<'a> {
                                         shakmaty::EnPassantMode::Legal,
                                     )
                                     .to_string(),
-                                    Duration::milliseconds(3000),
-                                    Duration::milliseconds(3000),
                                 );
                             }
                         }

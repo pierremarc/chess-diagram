@@ -1,11 +1,10 @@
 use std::{
     str::FromStr,
-    sync::mpsc::{channel, Receiver, RecvError, Sender},
+    sync::mpsc::{Receiver, RecvError, Sender, channel},
     thread,
 };
 
-use chrono::Duration;
-use shakmaty::{fen::Fen, Chess, Color, FromSetup, Position};
+use shakmaty::{Chess, Color, FromSetup, Position, fen::Fen};
 use shakmaty_uci::{UciInfo, UciInfoScore, UciMessage, UciMove};
 
 use crate::Score;
@@ -80,11 +79,7 @@ impl UciEngine {
                 }
                 Ok(msg) => match msg {
                     EngineCommand::NewGame => self.new_game(),
-                    EngineCommand::Go {
-                        fen,
-                        white_time,
-                        black_time,
-                    } => self.go(fen, white_time, black_time),
+                    EngineCommand::Go { fen, depth } => self.go(fen, depth),
                     EngineCommand::Stop => break,
                 },
             }
@@ -112,7 +107,7 @@ impl UciEngine {
             .command_with_duration("ucinewgame", std::time::Duration::from_millis(100));
     }
 
-    fn go(&self, fen_string: String, white_time: Duration, black_time: Duration) {
+    fn go(&self, fen_string: String, depth: u8) {
         if let Ok(fen) = Fen::from_str(&fen_string) {
             let setpos = shakmaty_uci::UciMessage::Position {
                 startpos: false,
@@ -120,14 +115,15 @@ impl UciEngine {
                 moves: Vec::new(),
             };
             let goc = shakmaty_uci::UciMessage::Go {
-                time_control: Some(shakmaty_uci::UciTimeControl::TimeLeft {
-                    white_time: Some(white_time.to_std().expect("positive duration")),
-                    black_time: Some(black_time.to_std().expect("positive duration")),
-                    white_increment: None,
-                    black_increment: None,
-                    moves_to_go: None,
-                }),
-                search_control: None,
+                // time_control: Some(shakmaty_uci::UciTimeControl::TimeLeft {
+                //     white_time: Some(white_time.to_std().expect("positive duration")),
+                //     black_time: Some(black_time.to_std().expect("positive duration")),
+                //     white_increment: None,
+                //     black_increment: None,
+                //     moves_to_go: None,
+                // }),
+                time_control: None,
+                search_control: Some(shakmaty_uci::UciSearchControl::depth(depth)),
             };
             if self.engine.command(&setpos.to_string()).is_ok() {
                 let _ = self
@@ -274,11 +270,10 @@ impl Engine for EngineConnection {
         let _ = self.tx.send(EngineCommand::Stop);
     }
 
-    fn go(&self, fen_string: String, white_time: Duration, black_time: Duration) {
+    fn go(&self, fen_string: String, depth: u8) {
         let _ = self.tx.send(EngineCommand::Go {
             fen: fen_string,
-            white_time,
-            black_time,
+            depth,
         });
     }
 
