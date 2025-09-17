@@ -32,6 +32,7 @@ pub fn render_board(
     game: &Chess,
     last_move: Option<&Move>,
     title: Option<String>,
+    highlight_square: Option<Square>,
 ) {
     // let mut state = ss_main.borrow_mut();
     let lid = ui.layer_id();
@@ -84,9 +85,9 @@ pub fn render_board(
 
             let rank = rank_from_index(rank_index);
             let file = file_from_index(file_index);
+            let square = Square::from_coords(file, rank);
 
             let (text_color, font, rank_text, file_text) = {
-                let square = Square::from_coords(file, rank);
                 if let Some(to) = last_move_to
                     && square == to
                 {
@@ -139,6 +140,16 @@ pub fn render_board(
                 text_color,
             );
 
+            highlight_square.map(|highlight| {
+                if highlight == square {
+                    let _ = painter.rect_filled(
+                        square_rect,
+                        CornerRadius::same(2),
+                        Color32::from_rgba_unmultiplied(0, 183, 235, 24),
+                    );
+                }
+            });
+
             // match (last_move_from, last_move_to) {
             //     (Some(_from), Some(to)) => {
             //         let square = Square::from_coords(file, rank);
@@ -154,7 +165,7 @@ pub fn render_board(
             //     _ => {}
             // }
 
-            if let Some(piece) = game.board().piece_at((file, rank).into()) {
+            if let Some(piece) = game.board().piece_at(square) {
                 let piece_name = format!("{}", piece.char());
                 if let Some(image) = sources.get(piece_name) {
                     image.paint_at(ui, square_rect);

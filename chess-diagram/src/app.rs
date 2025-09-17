@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, RwLock};
 
-use egui::Key;
+use egui::{Key, Vec2};
 use egui_extras::install_image_loaders;
 use log::info;
 use shakmaty::fen::Fen;
@@ -11,15 +11,21 @@ use shakmaty::{Chess, Move, Position};
 use crate::board::{render_board, square_at};
 use crate::config::get_engine_color;
 use crate::game::GameState;
-use crate::gesture::Gesture;
+use crate::gesture::{Gesture, StateStart};
 use crate::promotion::render_promotion;
 use crate::proxy::{Proxy, start_engine};
 use crate::sources::Sources;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum Mode {
+enum BoardMode {
     Play,
     Setup,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum PointerMode {
+    Drag,
+    Click,
 }
 
 pub struct DiagramApp<'a> {
@@ -27,7 +33,8 @@ pub struct DiagramApp<'a> {
     game: Arc<RwLock<GameState>>,
     engine: Arc<Proxy>,
     sources: Sources<'a>,
-    mode: Mode,
+    board_mode: BoardMode,
+    pointer_mode: PointerMode,
 }
 
 impl<'a> DiagramApp<'a> {
@@ -53,7 +60,8 @@ impl<'a> DiagramApp<'a> {
             game: game_state.clone(),
             sources: Sources::new(),
             engine: Arc::new(start_engine(game_state.clone(), ctx)),
-            mode: Mode::Play,
+            board_mode: BoardMode::Play,
+            pointer_mode: PointerMode::Drag,
         }
     }
 }
@@ -67,12 +75,12 @@ impl<'a> DiagramApp<'a> {
         }
     }
 
-    fn set_mode(&mut self, mode: Mode) {
-        use Mode::*;
+    fn set_board_mode(&mut self, mode: BoardMode) {
+        use BoardMode::*;
         match mode {
-            Setup => self.mode = Setup,
+            Setup => self.board_mode = Setup,
             Play => {
-                self.mode = Play;
+                self.board_mode = Play;
                 if let Ok(game_state) = self.game.read() {
                     self.engine.play(
                         Fen::from_position(game_state.game.clone(), shakmaty::EnPassantMode::Legal)
@@ -80,6 +88,16 @@ impl<'a> DiagramApp<'a> {
                     );
                 }
             }
+        }
+    }
+    fn toggle_pointer_mode(&mut self) {
+        use PointerMode::*;
+        let _ = self.gesture.try_borrow_mut().map(|mut gesture| {
+            *gesture = Gesture::None;
+        });
+        match self.pointer_mode {
+            Drag => self.pointer_mode = Click,
+            Click => self.pointer_mode = Drag,
         }
     }
 }
@@ -117,6 +135,16 @@ impl<'a> eframe::App for DiagramApp<'a> {
                     let gesture = gesture.borrow();
                     let game_state = game_state.read().unwrap();
                     let title = game_state.opening.clone();
+                    let highlight_square = if self.pointer_mode == PointerMode::Click {
+                        if let Gesture::Start(StateStart { from, .. }) = *gesture {
+                            Some(from)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
                     render_board(
                         ctx,
                         ui,
@@ -125,6 +153,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
                         &game_state.game,
                         game_state.moves.last(),
                         title,
+                        highlight_square,
                     );
                 }
                 {
@@ -174,7 +203,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
                         let mut game_state = self.game.write().unwrap();
                         *gesture = Gesture::new();
                         game_state.make_move(move_);
-                        if self.mode == Mode::Play {
+                        if self.board_mode == BoardMode::Play {
                             if let Some((move_, _)) =
                                 game_state.openings.find_move(&game_state.game)
                             {
@@ -193,33 +222,82 @@ impl<'a> eframe::App for DiagramApp<'a> {
                     _ => {}
                 }
 
-                ui.input(|input| {
-                    if let Some(position) = input.pointer.interact_pos() {
-                        if input.pointer.button_pressed(egui::PointerButton::Primary) {
-                            square_at(&ui.max_rect(), position).map(|from| {
-                                let _ = game_state.read().map(|game_state| {
-                                    game_state.game.board().piece_at(from).map(|piece| {
-                                        let _ = gesture.try_borrow_mut().map(|mut gesture| {
-                                            info!("start with {:?} from {}", &piece, &from);
-                                            *gesture = gesture.start(from, piece);
+                if self.pointer_mode == PointerMode::Click {
+                    ui.input(|input| {
+                        if let Some(position) = input.pointer.interact_pos() {
+                            if input.pointer.primary_clicked() {
+                                let _ = gesture.try_borrow_mut().map(|mut gesture| {
+                                    log::info!("CLICk {:?}", gesture);
+                                    match *gesture {
+                                        Gesture::None => {
+                                            square_at(&ui.max_rect(), position).map(|from| {
+                                                let _ = game_state.read().map(|game_state| {
+                                                    game_state.game.board().piece_at(from).map(
+                                                        |piece| {
+                                                            info!(
+                                                                "start with {:?} from {}",
+                                                                &piece, &from
+                                                            );
+                                                            *gesture = gesture.start(from, piece);
+                                                        },
+                                                    );
+                                                });
+                                            });
+                                        }
+                                        Gesture::Start(StateStart { from, .. }) => {
+                                            square_at(&ui.max_rect(), position).map(|to| {
+                                                info!("ON  {to}",);
+                                                if from != to {
+                                                    *gesture = gesture.moving(position).end(to);
+                                                } else {
+                                                    *gesture = Gesture::None;
+                                                }
+                                            });
+                                        }
+                                        _ => {}
+                                    }
+                                });
+                            }
+                        }
+                    });
+                } else {
+                    ui.input(|input| {
+                        if let Some(position) = input.pointer.interact_pos() {
+                            if input.pointer.button_pressed(egui::PointerButton::Primary) {
+                                let _ = gesture.try_borrow_mut().map(|mut gesture| {
+                                    log::info!("PRESS {:?}", gesture);
+                                    if let Gesture::None = *gesture {
+                                        square_at(&ui.max_rect(), position).map(|from| {
+                                            let _ = game_state.read().map(|game_state| {
+                                                game_state.game.board().piece_at(from).map(
+                                                    |piece| {
+                                                        info!(
+                                                            "start with {:?} from {}",
+                                                            &piece, &from
+                                                        );
+                                                        *gesture = gesture.start(from, piece);
+                                                    },
+                                                );
+                                            });
                                         });
+                                    }
+                                });
+                            } else if input.pointer.button_down(egui::PointerButton::Primary) {
+                                let _ = gesture.try_borrow_mut().map(|mut gesture| {
+                                    *gesture = gesture.moving(position);
+                                });
+                            } else if input.pointer.button_released(egui::PointerButton::Primary) {
+                                log::info!("RELEASE");
+                                square_at(&ui.max_rect(), position).map(|to| {
+                                    let _ = gesture.try_borrow_mut().map(|mut gesture| {
+                                        info!("end to {}", &to);
+                                        *gesture = gesture.end(to);
                                     });
                                 });
-                            });
-                        } else if input.pointer.button_down(egui::PointerButton::Primary) {
-                            let _ = gesture.try_borrow_mut().map(|mut gesture| {
-                                *gesture = gesture.moving(position);
-                            });
-                        } else if input.pointer.button_released(egui::PointerButton::Primary) {
-                            square_at(&ui.max_rect(), position).map(|to| {
-                                let _ = gesture.try_borrow_mut().map(|mut gesture| {
-                                    info!("end to {}", &to);
-                                    *gesture = gesture.end(to);
-                                });
-                            });
+                            }
                         }
-                    }
-                });
+                    });
+                }
 
                 // if processed inside ui.input, it deadlocks on rwlock<context> acquisisition
                 let mut viewport_commands: Vec<egui::ViewportCommand> = Vec::new();
@@ -242,11 +320,15 @@ impl<'a> eframe::App for DiagramApp<'a> {
                     }
 
                     if input.key_released(Key::S) {
-                        self.set_mode(Mode::Setup);
+                        self.set_board_mode(BoardMode::Setup);
                     }
 
                     if input.key_released(Key::P) {
-                        self.set_mode(Mode::Play);
+                        self.set_board_mode(BoardMode::Play);
+                    }
+
+                    if input.key_released(Key::I) {
+                        self.toggle_pointer_mode();
                     }
                 });
 

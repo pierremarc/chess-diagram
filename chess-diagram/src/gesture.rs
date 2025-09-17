@@ -5,8 +5,8 @@ use shakmaty::{Piece, Rank, Role, Square};
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct StateStart {
     // position: Pos2,
-    from: Square,
-    piece: Piece,
+    pub from: Square,
+    pub piece: Piece,
     // to: Option<Square>,
 }
 
@@ -18,9 +18,9 @@ impl StateStart {
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct StateMoving {
-    position: Pos2,
-    from: Square,
-    piece: Piece,
+    pub position: Pos2,
+    pub from: Square,
+    pub piece: Piece,
 }
 
 impl StateMoving {
@@ -72,10 +72,10 @@ impl Promotion {
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct StateEnd {
     // position: Pos2,
-    from: Square,
-    piece: Piece,
-    to: Square,
-    promotion: Promotion,
+    pub from: Square,
+    pub piece: Piece,
+    pub to: Square,
+    pub promotion: Promotion,
 }
 
 impl StateEnd {
@@ -132,6 +132,20 @@ impl Gesture {
 
     pub fn start(&self, from: Square, piece: Piece) -> Self {
         Gesture::Start(StateStart::new(from, piece))
+    }
+
+    pub fn restart(&self) -> Self {
+        match self {
+            Gesture::Moving(state) => Gesture::Start(StateStart {
+                from: state.from,
+                piece: state.piece,
+            }),
+            Gesture::End(state) => Gesture::Start(StateStart {
+                from: state.from,
+                piece: state.piece,
+            }),
+            _ => *self,
+        }
     }
 
     pub fn moving(&self, position: Pos2) -> Self {
