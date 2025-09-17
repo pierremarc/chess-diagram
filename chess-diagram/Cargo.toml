@@ -1,0 +1,63 @@
+[package]
+name = "chess-diagram"
+description.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+
+
+[dependencies]
+egui = "0.32"
+eframe = { version = "0.32", default-features = false, features = [
+    
+#    "accesskit",     # Make egui compatible with screen readers. NOTE: adds a lot of dependencies.
+    "default_fonts", # Embed the default egui fonts.
+    "glow",          # Use the glow rendering backend. Alternative: "wgpu".
+#    "persistence",   # Enable restoring app state when restarting the app.
+    "wayland",       # To support Linux (and CI)
+#    "x11",           # To support older Linux distributions (restores one of the default features)
+] }
+
+
+image = "0.25.8"
+egui_extras = { version = "0.32", features = ["all_loaders"] }
+
+
+chrono.workspace = true
+clap.workspace = true
+log.workspace = true
+shakmaty.workspace = true
+shakmaty-uci.workspace = true
+uci.workspace = true
+
+
+ucui-engine = { path = "../engine" }
+ucui-eco = { path = "../eco" }
+
+
+
+# You only need serde if you want app persistence:
+serde = { version = "1.0.219", features = ["derive"] }
+rand = "0.9.2"
+
+# native:
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+env_logger = "0.11.8"
+
+# web:
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4.50"
+web-sys = "0.3.70"              # to access the DOM (to hide the loading text)
+
+[profile.release]
+opt-level = 2 # fast and small wasm
+
+# Optimize all dependencies even in debug builds:
+[profile.dev.package."*"]
+opt-level = 2
+

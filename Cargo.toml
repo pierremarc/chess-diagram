@@ -1,0 +1,32 @@
+[workspace]
+members = [ "chess-diagram", "eco", "engine",  "utils"]
+resolver = "2"
+
+[workspace.package]
+description = "A chess board"
+version = "0.1.4"
+edition = "2024"
+license = "AGPL-3.0"
+# license-file = "LICENSE"
+authors = ["Pierre Marchand <pierremarc07@gmail.com>"]
+repository = "https://github.com/pierremarc/ucui"
+homepage = "https://github.com/pierremarc/ucui"
+readme = "README.md"
+keywords = ["chess", "tui"]
+
+
+[profile.release]
+debug = 1
+lto = "thin"
+
+
+[workspace.dependencies]
+chrono = { version = "0.4.38", features = ["serde"] }
+clap = { version = "4.5.24", features = ["derive"] }
+log = { version = "0.4.24", features = ["std"] }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
+shakmaty = "0.27.2"
+shakmaty-uci = "0.1.1"
+uci = "0.2.3"
+

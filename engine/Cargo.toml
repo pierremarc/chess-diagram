@@ -1,0 +1,17 @@
+[package]
+name = "ucui-engine"
+description = "ucui engine"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+log.workspace = true
+chrono.workspace = true
+uci.workspace =true
+serde.workspace =true
+shakmaty.workspace =true
+shakmaty-uci.workspace =true
+ucui-utils = { path = "../utils" }
+
+
