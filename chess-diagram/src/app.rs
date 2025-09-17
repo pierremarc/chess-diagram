@@ -6,7 +6,7 @@ use egui::{Key, Vec2};
 use egui_extras::install_image_loaders;
 use log::info;
 use shakmaty::fen::Fen;
-use shakmaty::{Chess, Move, Position};
+use shakmaty::{Chess, Move, Outcome, Position};
 
 use crate::board::{render_board, square_at};
 use crate::config::get_engine_color;
@@ -113,6 +113,22 @@ impl<'a> eframe::App for DiagramApp<'a> {
         // let gesture = &mut self.gesture;
         let gesture = self.gesture.clone();
         let game_state = self.game.clone();
+        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                let keys = [
+                    ("Q", "Quit"),
+                    ("F", "Fullscreen"),
+                    ("N", "New game"),
+                    ("S", "Setup"),
+                    ("P", "Engine Play"),
+                    ("I", "Toggle click | drag"),
+                ];
+                for (key, label) in keys {
+                    ui.label(format!("[{key}] {label}"));
+                    ui.separator();
+                }
+            });
+        });
 
         // {
         //     egui::SidePanel::right("side")
@@ -134,13 +150,17 @@ impl<'a> eframe::App for DiagramApp<'a> {
                 {
                     let gesture = gesture.borrow();
                     let game_state = game_state.read().unwrap();
-                    let title = game_state.opening.clone().and_then(|eco| {
-                        if eco.moves.len() <= game_state.moves.len() {
-                            Some(eco.name.clone())
-                        } else {
-                            None
-                        }
-                    });
+                    let title = if let Some(outcome) = game_state.game.outcome() {
+                        Some(outcome.to_string())
+                    } else {
+                        game_state.opening.clone().and_then(|eco| {
+                            if eco.moves.len() >= game_state.moves.len() {
+                                Some(eco.name.clone())
+                            } else {
+                                None
+                            }
+                        })
+                    };
                     let highlight_square = if self.pointer_mode == PointerMode::Click {
                         if let Gesture::Start(StateStart { from, .. }) = *gesture {
                             Some(from)
