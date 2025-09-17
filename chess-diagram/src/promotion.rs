@@ -57,13 +57,13 @@ pub fn render_promotion(ctx: &Context, ui: &mut Ui, sources: &Sources<'_>, gestu
                     Rect::from_min_size(pos2(left, top + offset), vec2(square_size, square_size));
                 // log::info!("R> {rect} {role:?}");
                 image.paint_at(ui, rect);
-                buttons.push((rect, role.clone()));
+                buttons.push((rect, *role));
             }
         }
 
         ui.input(|input| {
-            if input.pointer.primary_clicked() {
-                if let Some(position) = input.pointer.interact_pos() {
+            if input.pointer.primary_clicked()
+                && let Some(position) = input.pointer.interact_pos() {
                     for (rect, role) in buttons {
                         if rect.contains(position) {
                             log::info!("=> {} {}  -> {:?}", rect, position, role);
@@ -72,7 +72,6 @@ pub fn render_promotion(ctx: &Context, ui: &mut Ui, sources: &Sources<'_>, gestu
                         }
                     }
                 }
-            }
         })
     }
 

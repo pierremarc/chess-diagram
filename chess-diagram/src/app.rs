@@ -2,11 +2,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, RwLock};
 
-use egui::{Key, Vec2};
+use egui::Key;
 use egui_extras::install_image_loaders;
 use log::info;
 use shakmaty::fen::Fen;
-use shakmaty::{Chess, Move, Outcome, Position};
+use shakmaty::{Chess, Move, Position};
 
 use crate::board::{render_board, square_at};
 use crate::config::get_engine_color;
@@ -104,9 +104,6 @@ impl<'a> DiagramApp<'a> {
 
 impl<'a> eframe::App for DiagramApp<'a> {
     /// Called by the framework to save state before shutdown.
-    // fn save(&mut self, storage: &mut dyn eframe::Storage) {
-    //     eframe::set_value(storage, eframe::APP_KEY, self);
-    // }
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -208,7 +205,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
                                         && m.from() == Some(state.from())
                                         && state.promotion().comp_move(m.promotion())
                                 })
-                                .map(|m| m.clone())
+                                .cloned()
                                 .collect();
 
                             (moves_.first().cloned(), true)
@@ -250,50 +247,14 @@ impl<'a> eframe::App for DiagramApp<'a> {
 
                 if self.pointer_mode == PointerMode::Click {
                     ui.input(|input| {
-                        if let Some(position) = input.pointer.interact_pos() {
-                            if input.pointer.primary_clicked() {
-                                let _ = gesture.try_borrow_mut().map(|mut gesture| {
-                                    log::info!("CLICk {:?}", gesture);
-                                    match *gesture {
-                                        Gesture::None => {
-                                            square_at(&ui.max_rect(), position).map(|from| {
-                                                let _ = game_state.read().map(|game_state| {
-                                                    game_state.game.board().piece_at(from).map(
-                                                        |piece| {
-                                                            info!(
-                                                                "start with {:?} from {}",
-                                                                &piece, &from
-                                                            );
-                                                            *gesture = gesture.start(from, piece);
-                                                        },
-                                                    );
-                                                });
-                                            });
-                                        }
-                                        Gesture::Start(StateStart { from, .. }) => {
-                                            square_at(&ui.max_rect(), position).map(|to| {
-                                                info!("ON  {to}",);
-                                                if from != to {
-                                                    *gesture = gesture.moving(position).end(to);
-                                                } else {
-                                                    *gesture = Gesture::None;
-                                                }
-                                            });
-                                        }
-                                        _ => {}
-                                    }
-                                });
-                            }
-                        }
-                    });
-                } else {
-                    ui.input(|input| {
-                        if let Some(position) = input.pointer.interact_pos() {
-                            if input.pointer.button_pressed(egui::PointerButton::Primary) {
-                                let _ = gesture.try_borrow_mut().map(|mut gesture| {
-                                    log::info!("PRESS {:?}", gesture);
-                                    if let Gesture::None = *gesture {
-                                        square_at(&ui.max_rect(), position).map(|from| {
+                        if let Some(position) = input.pointer.interact_pos()
+                            && input.pointer.primary_clicked()
+                        {
+                            let _ = gesture.try_borrow_mut().map(|mut gesture| {
+                                log::info!("CLICk {:?}", gesture);
+                                match *gesture {
+                                    Gesture::None => {
+                                        if let Some(from) = square_at(&ui.max_rect(), position) {
                                             let _ = game_state.read().map(|game_state| {
                                                 game_state.game.board().piece_at(from).map(
                                                     |piece| {
@@ -305,6 +266,37 @@ impl<'a> eframe::App for DiagramApp<'a> {
                                                     },
                                                 );
                                             });
+                                        }
+                                    }
+                                    Gesture::Start(StateStart { from, .. }) => {
+                                        square_at(&ui.max_rect(), position).map(|to| {
+                                            info!("ON  {to}",);
+                                            if from != to {
+                                                *gesture = gesture.moving(position).end(to);
+                                            } else {
+                                                *gesture = Gesture::None;
+                                            }
+                                        });
+                                    }
+                                    _ => {}
+                                }
+                            });
+                        }
+                    });
+                } else {
+                    ui.input(|input| {
+                        if let Some(position) = input.pointer.interact_pos() {
+                            if input.pointer.button_pressed(egui::PointerButton::Primary) {
+                                let _ = gesture.try_borrow_mut().map(|mut gesture| {
+                                    log::info!("PRESS {:?}", gesture);
+                                    if let Gesture::None = *gesture
+                                        && let Some(from) = square_at(&ui.max_rect(), position)
+                                    {
+                                        let _ = game_state.read().map(|game_state| {
+                                            game_state.game.board().piece_at(from).map(|piece| {
+                                                info!("start with {:?} from {}", &piece, &from);
+                                                *gesture = gesture.start(from, piece);
+                                            });
                                         });
                                     }
                                 });
@@ -314,12 +306,12 @@ impl<'a> eframe::App for DiagramApp<'a> {
                                 });
                             } else if input.pointer.button_released(egui::PointerButton::Primary) {
                                 log::info!("RELEASE");
-                                square_at(&ui.max_rect(), position).map(|to| {
+                                if let Some(to) = square_at(&ui.max_rect(), position) {
                                     let _ = gesture.try_borrow_mut().map(|mut gesture| {
                                         info!("end to {}", &to);
                                         *gesture = gesture.end(to);
                                     });
-                                });
+                                }
                             }
                         }
                     });

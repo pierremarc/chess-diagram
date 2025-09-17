@@ -51,7 +51,7 @@ impl Openings {
     fn new() -> Self {
         let variants = if let Some(opening) = get_opening() {
             lookup_eco_from_name(&opening)
-        } else if get_eco_codes().len() > 0 {
+        } else if !get_eco_codes().is_empty() {
             let mut variants = Vec::new();
             for eco in get_eco_codes() {
                 variants.extend(lookup_eco_from_code(&eco));

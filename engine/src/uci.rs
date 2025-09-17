@@ -177,7 +177,8 @@ fn get_score(infos: &Vec<UciInfo>, color: Color, best_move: &UciMove) -> Score {
         .max()
         .unwrap_or(0);
 
-    let score = candidates
+    
+    candidates
         .into_iter()
         .filter(|c| c.pv.len() == max_len)
         .reduce(|acc, info| {
@@ -191,8 +192,7 @@ fn get_score(infos: &Vec<UciInfo>, color: Color, best_move: &UciMove) -> Score {
             }
         })
         .map(|info| Score::from(info.clone()))
-        .unwrap_or(Score::None);
-    score
+        .unwrap_or(Score::None)
 }
 
 enum CompScore {

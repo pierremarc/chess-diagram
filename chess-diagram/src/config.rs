@@ -75,7 +75,7 @@ pub fn get_engine_args() -> Option<Vec<String>> {
 }
 
 pub fn get_engine_color() -> Color {
-    config().engine_color.clone()
+    config().engine_color
 }
 pub fn get_engine_depth() -> u8 {
     config().engine_depth

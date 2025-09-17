@@ -25,14 +25,14 @@ pub fn render_side(ctx: &Context, ui: &mut Ui, state: &GameState) {
     });
 
     ui.add_space(MARGIN);
-    for (i, pair) in state.moves.chunks(2).into_iter().enumerate() {
-        match (pair.get(0), pair.get(1)) {
+    for (i, pair) in state.moves.chunks(2).enumerate() {
+        match (pair.first(), pair.get(1)) {
             (Some(a), Some(b)) => {
                 let sana = San::from_move(&state.game, a).to_string();
                 let sanb = San::from_move(&state.game, b).to_string();
                 let spacing = vec![" "; 10 - sana.len()]
                     .iter()
-                    .map(|s| format!("{s}"))
+                    .map(|s| s.to_string())
                     .collect::<String>();
                 ui.label(format!("{}. {}{}{}", i + 1, sana, spacing, sanb));
             }
