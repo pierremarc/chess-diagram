@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use rand::seq::IndexedRandom;
 use shakmaty::{Chess, Color, FromSetup, Move, Position, fen::Fen};
 use ucui_eco::{
-    find_eco_from_moves, get_openings_table, lookup_eco_from_code, lookup_eco_from_name,
+    Eco, find_eco_from_moves, get_openings_table, lookup_eco_from_code, lookup_eco_from_name,
 };
 
 use crate::config::{get_eco_codes, get_opening};
@@ -13,7 +13,7 @@ pub struct GameState {
     pub moves: Vec<Move>,
     pub engine_color: Color,
     pub openings: Openings,
-    pub opening: Option<String>,
+    pub opening: Option<Eco>,
 }
 
 impl GameState {
@@ -35,7 +35,7 @@ impl GameState {
     pub fn make_move(&mut self, move_: Move) {
         if let Ok(new_game) = self.game.clone().play(&move_) {
             self.moves.push(move_.clone());
-            self.opening = find_eco_from_moves(&self.moves).map(|eco| eco.name.clone());
+            self.opening = find_eco_from_moves(&self.moves).cloned();
             self.game = new_game;
         };
     }

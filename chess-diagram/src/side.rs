@@ -20,7 +20,7 @@ pub fn render_side(ctx: &Context, ui: &mut Ui, state: &GameState) {
         //     FontId::proportional(12.0),
         //     Color32::BLACK,
         // );
-        ui.label(opening);
+        ui.label(opening.name.clone());
         ui.separator();
     });
 

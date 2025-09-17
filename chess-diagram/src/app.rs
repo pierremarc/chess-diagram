@@ -134,7 +134,13 @@ impl<'a> eframe::App for DiagramApp<'a> {
                 {
                     let gesture = gesture.borrow();
                     let game_state = game_state.read().unwrap();
-                    let title = game_state.opening.clone();
+                    let title = game_state.opening.clone().and_then(|eco| {
+                        if eco.moves.len() <= game_state.moves.len() {
+                            Some(eco.name.clone())
+                        } else {
+                            None
+                        }
+                    });
                     let highlight_square = if self.pointer_mode == PointerMode::Click {
                         if let Gesture::Start(StateStart { from, .. }) = *gesture {
                             Some(from)
