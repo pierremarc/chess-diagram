@@ -1,4 +1,4 @@
-use shakmaty::{File, Move, Square};
+use shakmaty::{Chess, File, Move, Position, Square, san::San, uci::UciMove};
 
 /// Sadly, `shakmaty` uses Chess960 logic for its casling moves, it breaks.
 /// So we provide a little one to right their wrong.
@@ -12,4 +12,17 @@ pub fn move_classic_to(move_: &Move) -> Square {
         },
         _ => move_.to(),
     }
+}
+
+pub fn ucimovelist_to_sanlist(mut game: Chess, movelist: &Vec<UciMove>) -> Vec<String> {
+    let mut result = Vec::with_capacity(movelist.len());
+    for uci_move in movelist {
+        if let Ok(move_) = uci_move.to_move(&game) {
+            result.push(San::from_move(&game, &move_).to_string());
+            game = game.clone().play(&move_).expect("Illegal move?");
+        } else {
+            return result;
+        }
+    }
+    result
 }

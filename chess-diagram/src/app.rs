@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::fmt::format;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -6,7 +7,10 @@ use egui::Key;
 use egui_extras::install_image_loaders;
 use log::info;
 use shakmaty::fen::Fen;
+use shakmaty::san::San;
 use shakmaty::{Chess, Move, Position};
+use ucui_engine::Score;
+use ucui_utils::ucimovelist_to_sanlist;
 
 use crate::board::{render_board, square_at};
 use crate::config::get_engine_color;
@@ -149,6 +153,30 @@ impl<'a> eframe::App for DiagramApp<'a> {
                     let game_state = game_state.read().unwrap();
                     let title = if let Some(outcome) = game_state.game.outcome() {
                         Some(outcome.to_string())
+                    // } else if let Score::Mate { moves } = game_state.score {
+                    //     Some(format!("Mate in {moves}"))
+                    // } else if let Score::CentiPawns { score, pv } = &game_state.score {
+                    //     let mut game = Chess::new();
+                    //     let n = game_state.moves.len() - 1;
+                    //     for m in game_state.moves.iter().take(n) {
+                    //         let _ = game.clone().play(m).map(|new_game| {
+                    //             game = new_game;
+                    //         });
+                    //     }
+                    //     let moves: Vec<String> = ucimovelist_to_sanlist(game, pv)
+                    //         .chunks(2)
+                    //         .enumerate()
+                    //         .map(|(i, pair)| match (pair.get(0), pair.get(1)) {
+                    //             (Some(a), Some(b)) => {
+                    //                 format!("{}.{} {}", i + 1, a, b)
+                    //             }
+                    //             (Some(a), None) => {
+                    //                 format!("{}.{} …", i + 1, a)
+                    //             }
+                    //             _ => String::from("??"),
+                    //         })
+                    //         .collect();
+                    //     Some(format!("[{}]  {}", *score as f32 / 100.0, moves.join("  ")))
                     } else {
                         game_state.opening.clone().and_then(|eco| {
                             if eco.moves.len() >= game_state.moves.len() {
@@ -225,6 +253,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
                         let mut gesture = self.gesture.borrow_mut();
                         let mut game_state = self.game.write().unwrap();
                         *gesture = Gesture::new();
+                        game_state.clear_score();
                         game_state.make_move(move_);
                         if self.board_mode == BoardMode::Play {
                             if let Some((move_, _)) =

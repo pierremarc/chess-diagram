@@ -5,6 +5,7 @@ use shakmaty::{Chess, Color, FromSetup, Move, Position, fen::Fen};
 use ucui_eco::{
     Eco, find_eco_from_moves, get_openings_table, lookup_eco_from_code, lookup_eco_from_name,
 };
+use ucui_engine::Score;
 
 use crate::config::{get_eco_codes, get_opening};
 
@@ -14,6 +15,7 @@ pub struct GameState {
     pub engine_color: Color,
     pub openings: Openings,
     pub opening: Option<Eco>,
+    pub score: Score,
 }
 
 impl GameState {
@@ -29,6 +31,7 @@ impl GameState {
                 .unwrap_or_default(),
             openings: Openings::new(),
             opening: None,
+            score: Score::None,
         }
     }
 
@@ -38,6 +41,14 @@ impl GameState {
             self.opening = find_eco_from_moves(&self.moves).cloned();
             self.game = new_game;
         };
+    }
+
+    pub fn clear_score(&mut self) {
+        self.score = Score::None;
+    }
+
+    pub fn set_score(&mut self, score: Score) {
+        self.score = score;
     }
 }
 

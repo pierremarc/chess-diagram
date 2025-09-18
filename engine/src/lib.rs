@@ -32,20 +32,27 @@ pub enum EngineCommand {
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "_tag")]
 pub enum Score {
-    CentiPawns { score: i32 },
-    Mate { moves: i8 },
+    CentiPawns {
+        score: i32,
+        pv: Vec<shakmaty_uci::UciMove>,
+    },
+    Mate {
+        moves: i8,
+    },
     None,
 }
 
 impl From<UciInfo> for Score {
     fn from(value: UciInfo) -> Self {
         if let UciInfo {
-            score: Some(score), ..
+            score: Some(score),
+            pv,
+            ..
         } = value
         {
             match (score.cp, score.mate) {
                 (None, None) => Score::None,
-                (Some(score), None) => Score::CentiPawns { score },
+                (Some(score), None) => Score::CentiPawns { score, pv },
                 (_, Some(moves)) => Score::Mate { moves },
             }
         } else {

@@ -60,12 +60,13 @@ pub fn start_engine(state: Arc<RwLock<GameState>>, ctx: Arc<Mutex<Context>>) -> 
                     EngineCommand::Go { fen, depth } => {
                         engine.go(fen, depth);
 
-                        if let Ok(EngineMessage::BestMove { move_, score: _ }) = engine.recv() {
+                        if let Ok(EngineMessage::BestMove { move_, score }) = engine.recv() {
                             let move_: Move = move_.into();
                             log::info!("Engine played {move_}");
                             let mut state =
                                 state.write().expect("failed to get a writable game state");
                             state.make_move(move_);
+                            state.set_score(score);
 
                             if let Ok(ctx) = ctx.lock() {
                                 ctx.request_repaint();
