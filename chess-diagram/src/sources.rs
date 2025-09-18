@@ -55,6 +55,7 @@ pub struct Sources<'a> {
 
 impl<'a> Sources<'a> {
     pub fn new() -> Self {
+        log::info!("Init image sources");
         let mut collection = HashMap::new();
 
         let chessmen_set = include_bytes!("../assets/pieces-leipzig.png");
@@ -82,7 +83,7 @@ impl<'a> Sources<'a> {
                 bytes: bytes.into(),
             }),
         );
-
+        log::info!("image sources ready");
         Self { collection }
     }
 

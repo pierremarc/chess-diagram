@@ -49,6 +49,7 @@ pub struct Openings {
 
 impl Openings {
     fn new() -> Self {
+        log::info!("Init openings");
         let variants = if let Some(opening) = get_opening() {
             lookup_eco_from_name(&opening)
         } else if !get_eco_codes().is_empty() {
@@ -83,6 +84,7 @@ impl Openings {
                 }
             }
         }
+        log::info!("Openings ready");
 
         Self { index }
     }

@@ -10,22 +10,27 @@ mod proxy;
 mod side;
 mod sources;
 
+static DEFAULT_SIZE: [f32; 2] = [800.0, 600.0];
+
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result {
     use app::DiagramApp;
 
+    use crate::config::get_fullscreen;
+
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([800.0, 800.0])
-            .with_min_inner_size([800.0, 700.0])
+            .with_inner_size(DEFAULT_SIZE)
+            // .with_min_inner_size([800.0, 700.0])
             .with_icon(
                 // NOTE: Adding an icon is optional
                 eframe::icon_data::from_png_bytes(&include_bytes!("../assets/icon-256.png")[..])
                     .expect("Failed to load icon"),
-            ), // .with_fullscreen(true)
+            )
+            .with_fullscreen(get_fullscreen()),
         ..Default::default()
     };
     eframe::run_native(

@@ -6,8 +6,12 @@ use std::sync::OnceLock;
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 pub struct Config {
+    /// Start in fullscreen mode
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    fullscreen: bool,
+
     /// Path to a UCI engine
-    #[arg(short, long, value_name = "ENGINE")]
+    #[arg(long, value_name = "ENGINE")]
     engine: String,
 
     /// Optional arguments to pass to the engine (separated by ";")
@@ -26,7 +30,7 @@ pub struct Config {
     engine_color: Color,
 
     /// Engine color
-    #[arg(long, value_name = "ENGINE DEPTH", default_value = "16")]
+    #[arg(long, value_name = "ENGINE DEPTH", default_value = "32")]
     engine_depth: u8,
 
     /// UCI option
@@ -61,6 +65,10 @@ static CONFIG: OnceLock<Config> = OnceLock::new();
 
 pub fn config() -> &'static Config {
     CONFIG.get_or_init(Config::parse)
+}
+
+pub fn get_fullscreen() -> bool {
+    config().fullscreen
 }
 
 pub fn get_engine() -> String {
