@@ -1,7 +1,8 @@
 // use crate::pieces::Piece;
 // use Piece::*;
 use egui::{
-    Align2, Color32, Context, CornerRadius, FontId, Pos2, Rect, StrokeKind, Ui, Vec2, pos2, vec2,
+    Align2, Color32, Context, CornerRadius, FontId, Pos2, Rect, Stroke, StrokeKind, Ui, Vec2, pos2,
+    vec2,
 };
 use shakmaty::{Chess, File, Move, Position, Rank, Square};
 
@@ -64,6 +65,28 @@ pub fn render_board(
         (6.0, Color32::BLACK),
         StrokeKind::Middle,
     );
+
+    // turn
+    let turn_margin_x = MARGIN * 0.7;
+    let turn_margin_y = MARGIN / 3.0;
+    let turn_radius = 12.0;
+    if game.turn() == shakmaty::Color::Black {
+        let top = board_rect.min.y + turn_margin_y;
+        let left = board_rect.max.x + turn_margin_x;
+        let _ = painter.circle(pos2(left, top), turn_radius, Color32::BLACK, Stroke::NONE);
+    } else {
+        let top = board_rect.max.y - turn_margin_y;
+        let left = board_rect.max.x + turn_margin_x;
+        let stroke_width = 3.0;
+        // let radius = turn_radius - (stroke_width / 2.0);
+        let radius = turn_radius - stroke_width;
+        let _ = painter.circle(
+            pos2(left, top),
+            radius,
+            Color32::WHITE,
+            (stroke_width, Color32::BLACK),
+        );
+    }
 
     // let last_move_from = last_move.and_then(|move_| move_.from());
     let last_move_to = last_move.map(|move_| move_.to());
