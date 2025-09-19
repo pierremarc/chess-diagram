@@ -8,7 +8,7 @@ use egui_extras::install_image_loaders;
 use log::info;
 use shakmaty::fen::Fen;
 use shakmaty::san::San;
-use shakmaty::{Chess, Move, Position};
+use shakmaty::{Chess, Color, Move, Position};
 use ucui_engine::Score;
 use ucui_utils::ucimovelist_to_sanlist;
 
@@ -153,30 +153,38 @@ impl<'a> eframe::App for DiagramApp<'a> {
                     let game_state = game_state.read().unwrap();
                     let title = if let Some(outcome) = game_state.game.outcome() {
                         Some(outcome.to_string())
-                    // } else if let Score::Mate { moves } = game_state.score {
-                    //     Some(format!("Mate in {moves}"))
-                    // } else if let Score::CentiPawns { score, pv } = &game_state.score {
-                    //     let mut game = Chess::new();
-                    //     let n = game_state.moves.len() - 1;
-                    //     for m in game_state.moves.iter().take(n) {
-                    //         let _ = game.clone().play(m).map(|new_game| {
-                    //             game = new_game;
-                    //         });
-                    //     }
-                    //     let moves: Vec<String> = ucimovelist_to_sanlist(game, pv)
-                    //         .chunks(2)
-                    //         .enumerate()
-                    //         .map(|(i, pair)| match (pair.get(0), pair.get(1)) {
-                    //             (Some(a), Some(b)) => {
-                    //                 format!("{}.{} {}", i + 1, a, b)
-                    //             }
-                    //             (Some(a), None) => {
-                    //                 format!("{}.{} …", i + 1, a)
-                    //             }
-                    //             _ => String::from("??"),
-                    //         })
-                    //         .collect();
-                    //     Some(format!("[{}]  {}", *score as f32 / 100.0, moves.join("  ")))
+                    } else if let Score::Mate { moves } = game_state.score {
+                        Some(format!("Mate in {moves}"))
+                    } else if let Score::CentiPawns { score, pv } = &game_state.score {
+                        let mut game = Chess::new();
+                        let n = game_state.moves.len() - 1;
+                        for m in game_state.moves.iter().take(n) {
+                            let _ = game.clone().play(m).map(|new_game| {
+                                game = new_game;
+                            });
+                        }
+                        let start = game.fullmoves();
+                        let sanlist = if game.turn() == Color::Black {
+                            let mut sanlist = vec![String::from("…")];
+                            sanlist.extend(ucimovelist_to_sanlist(game, pv));
+                            sanlist
+                        } else {
+                            ucimovelist_to_sanlist(game, pv)
+                        };
+                        let moves: Vec<String> = sanlist
+                            .chunks(2)
+                            .enumerate()
+                            .map(|(i, pair)| match (pair.get(0), pair.get(1)) {
+                                (Some(a), Some(b)) => {
+                                    format!("{}.{} {}", start.saturating_add(i as u32), a, b)
+                                }
+                                (Some(a), None) => {
+                                    format!("{}.{} …", i + 1, a)
+                                }
+                                _ => String::from("??"),
+                            })
+                            .collect();
+                        Some(format!("[{}]  {}", *score as f32 / 100.0, moves.join("  ")))
                     } else {
                         game_state.opening.clone().and_then(|eco| {
                             if eco.moves.len() >= game_state.moves.len() {
