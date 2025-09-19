@@ -115,6 +115,14 @@ impl<'a> eframe::App for DiagramApp<'a> {
         let gesture = self.gesture.clone();
         let game_state = self.game.clone();
         egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+            let toggle_pointer = format!(
+                "Toggle {}",
+                if self.pointer_mode == PointerMode::Click {
+                    "drag"
+                } else {
+                    "click"
+                }
+            );
             ui.horizontal(|ui| {
                 let keys = [
                     ("Q", "Quit"),
@@ -122,7 +130,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
                     ("N", "New game"),
                     ("S", "Setup"),
                     ("P", "Engine Play"),
-                    ("I", "Toggle click | drag"),
+                    ("I", toggle_pointer.as_str()),
                 ];
                 for (key, label) in keys {
                     ui.label(format!("[{key}] {label}"));
