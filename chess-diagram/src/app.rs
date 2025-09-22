@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::fmt::format;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -7,10 +6,7 @@ use egui::Key;
 use egui_extras::install_image_loaders;
 use log::info;
 use shakmaty::fen::Fen;
-use shakmaty::san::San;
-use shakmaty::{Chess, Color, Move, Position};
-use ucui_engine::Score;
-use ucui_utils::ucimovelist_to_sanlist;
+use shakmaty::{Move, Position};
 
 use crate::board::{render_board, square_at};
 use crate::config::get_engine_color;
@@ -18,7 +14,9 @@ use crate::game::GameState;
 use crate::gesture::{Gesture, StateStart};
 use crate::promotion::render_promotion;
 use crate::proxy::{Proxy, start_engine};
+use crate::side::{render_game_side, render_tools_side};
 use crate::sources::Sources;
+use crate::variation::VariationTree;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum BoardMode {
@@ -73,8 +71,8 @@ impl<'a> DiagramApp<'a> {
 impl<'a> DiagramApp<'a> {
     fn new_game(&mut self) {
         if let Ok(mut game_state) = self.game.write() {
-            game_state.moves = Vec::new();
-            game_state.game = Chess::new();
+            game_state.tree = VariationTree::new();
+            // game_state.game = Chess::new();
             self.engine.new_game();
         }
     }
@@ -87,7 +85,7 @@ impl<'a> DiagramApp<'a> {
                 self.board_mode = Play;
                 if let Ok(game_state) = self.game.read() {
                     self.engine.play(
-                        Fen::from_position(game_state.game.clone(), shakmaty::EnPassantMode::Legal)
+                        Fen::from_position(game_state.game(), shakmaty::EnPassantMode::Legal)
                             .to_string(),
                     );
                 }
@@ -139,19 +137,30 @@ impl<'a> eframe::App for DiagramApp<'a> {
             });
         });
 
-        // {
-        //     egui::SidePanel::right("side")
-        //         .resizable(false)
-        //         .show_separator_line(false)
-        //         .min_width(ctx.screen_rect().width() * 0.1)
-        //         .max_width(ctx.screen_rect().width() * 0.2)
-        //         .frame(egui::Frame::NONE)
-        //         .show(ctx, |ui| {
-        //             ui.label("Info");
-        //             let game_state = game_state.read().unwrap();
-        //             render_side(ctx, ui, &game_state);
-        //         });
-        // }
+        {
+            egui::SidePanel::right("game panel")
+                .resizable(false)
+                .show_separator_line(false)
+                .min_width(ctx.screen_rect().width() * 0.2)
+                .max_width(ctx.screen_rect().width() * 0.25)
+                .frame(egui::Frame::NONE)
+                .show(ctx, |ui| {
+                    let mut game_state = game_state.write().unwrap();
+                    render_game_side(ctx, ui, &mut game_state);
+                });
+        }
+
+        {
+            // egui::SidePanel::left("tools panel")
+            //     .resizable(false)
+            //     .show_separator_line(false)
+            //     .min_width(ctx.screen_rect().width() * 0.1)
+            //     .max_width(ctx.screen_rect().width() * 0.2)
+            //     .frame(egui::Frame::NONE)
+            //     .show(ctx, |ui| {
+            //         render_tools_side(ctx, ui);
+            //     });
+        }
 
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
@@ -159,49 +168,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
                 {
                     let gesture = gesture.borrow();
                     let game_state = game_state.read().unwrap();
-                    let title = if let Some(outcome) = game_state.game.outcome() {
-                        Some(outcome.to_string())
-                    } else if let Score::Mate { moves } = game_state.score {
-                        Some(format!("Mate in {moves}"))
-                    } else if let Score::CentiPawns { score, pv } = &game_state.score {
-                        let mut game = Chess::new();
-                        let n = game_state.moves.len() - 1;
-                        for m in game_state.moves.iter().take(n) {
-                            let _ = game.clone().play(m).map(|new_game| {
-                                game = new_game;
-                            });
-                        }
-                        let start = game.fullmoves();
-                        let sanlist = if game.turn() == Color::Black {
-                            let mut sanlist = vec![String::from("…")];
-                            sanlist.extend(ucimovelist_to_sanlist(game, pv));
-                            sanlist
-                        } else {
-                            ucimovelist_to_sanlist(game, pv)
-                        };
-                        let moves: Vec<String> = sanlist
-                            .chunks(2)
-                            .enumerate()
-                            .map(|(i, pair)| match (pair.get(0), pair.get(1)) {
-                                (Some(a), Some(b)) => {
-                                    format!("{}.{} {}", start.saturating_add(i as u32), a, b)
-                                }
-                                (Some(a), None) => {
-                                    format!("{}.{} …", i + 1, a)
-                                }
-                                _ => String::from("??"),
-                            })
-                            .collect();
-                        Some(format!("[{}]  {}", *score as f32 / 100.0, moves.join("  ")))
-                    } else {
-                        game_state.opening.clone().and_then(|eco| {
-                            if eco.moves.len() >= game_state.moves.len() {
-                                Some(eco.name.clone())
-                            } else {
-                                None
-                            }
-                        })
-                    };
+
                     let highlight_square = if self.pointer_mode == PointerMode::Click {
                         if let Gesture::Start(StateStart { from, .. }) = *gesture {
                             Some(from)
@@ -217,9 +184,8 @@ impl<'a> eframe::App for DiagramApp<'a> {
                         ui,
                         &self.sources,
                         &gesture,
-                        &game_state.game,
-                        game_state.moves.last(),
-                        title,
+                        &game_state.game(),
+                        game_state.tree.moves().last(),
                         highlight_square,
                     );
                 }
@@ -234,14 +200,14 @@ impl<'a> eframe::App for DiagramApp<'a> {
                 let (move_, is_end) = {
                     let gesture = self.gesture.borrow();
                     let game_state = self.game.read().unwrap();
-                    let turn = game_state.game.turn();
+                    let turn = game_state.game().turn();
 
                     if let Gesture::End(state) = *gesture {
                         if turn != state.piece().color {
                             (None, false)
                         } else {
                             let moves_: Vec<Move> = game_state
-                                .game
+                                .game()
                                 .legal_moves()
                                 .iter()
                                 .filter(|m| {
@@ -271,15 +237,19 @@ impl<'a> eframe::App for DiagramApp<'a> {
                         *gesture = Gesture::new();
                         game_state.clear_score();
                         game_state.make_move(move_);
+                        log::info!("made move");
                         if self.board_mode == BoardMode::Play {
+                            log::info!("computer to play");
                             if let Some((move_, _)) =
-                                game_state.openings.find_move(&game_state.game)
+                                game_state.openings.find_move(&game_state.game())
                             {
+                                log::info!("Playing opening move {move_:?}");
                                 game_state.make_move(move_);
                             } else {
+                                log::info!("Sending request to engine");
                                 self.engine.play(
                                     Fen::from_position(
-                                        game_state.game.clone(),
+                                        game_state.game(),
                                         shakmaty::EnPassantMode::Legal,
                                     )
                                     .to_string(),
@@ -292,6 +262,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
 
                 if self.pointer_mode == PointerMode::Click {
                     ui.input(|input| {
+                        log::info!("processing click event");
                         if let Some(position) = input.pointer.interact_pos()
                             && input.pointer.primary_clicked()
                         {
@@ -301,7 +272,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
                                     Gesture::None => {
                                         if let Some(from) = square_at(&ui.max_rect(), position) {
                                             let _ = game_state.read().map(|game_state| {
-                                                game_state.game.board().piece_at(from).map(
+                                                game_state.game().board().piece_at(from).map(
                                                     |piece| {
                                                         info!(
                                                             "start with {:?} from {}",
@@ -330,6 +301,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
                     });
                 } else {
                     ui.input(|input| {
+                        log::info!("processing drage related events");
                         if let Some(position) = input.pointer.interact_pos() {
                             if input.pointer.button_pressed(egui::PointerButton::Primary) {
                                 let _ = gesture.try_borrow_mut().map(|mut gesture| {
@@ -338,7 +310,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
                                         && let Some(from) = square_at(&ui.max_rect(), position)
                                     {
                                         let _ = game_state.read().map(|game_state| {
-                                            game_state.game.board().piece_at(from).map(|piece| {
+                                            game_state.game().board().piece_at(from).map(|piece| {
                                                 info!("start with {:?} from {}", &piece, &from);
                                                 *gesture = gesture.start(from, piece);
                                             });
@@ -367,6 +339,7 @@ impl<'a> eframe::App for DiagramApp<'a> {
                 let vcr = &mut viewport_commands;
 
                 ui.input(|input| {
+                    log::info!("processing keyboard events");
                     if input.key_released(Key::F) {
                         let current = egui::ViewportInfo::default().fullscreen.unwrap_or(false);
                         // ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(!current));

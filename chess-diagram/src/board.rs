@@ -27,12 +27,11 @@ const BOARD_COLORS: [[bool;8];8] = [
 
 pub fn render_board(
     ctx: &Context,
-    ui: &Ui,
+    ui: &mut Ui,
     sources: &Sources<'_>,
     gesture: &Gesture,
     game: &Chess,
     last_move: Option<&Move>,
-    title: Option<String>,
     highlight_square: Option<Square>,
 ) {
     // let mut state = ss_main.borrow_mut();
@@ -45,18 +44,6 @@ pub fn render_board(
 
     // backround
     let _ = painter.rect_filled(rect, CornerRadius::ZERO, Color32::WHITE);
-
-    // title
-    title.map(|title| {
-        let pos = pos2(
-            board_rect.min.x + board_rect.width() / 2.0,
-            rect.min.y + MARGIN / 3.0,
-        );
-        let align = Align2::CENTER_TOP;
-        let font = FontId::proportional(16.0);
-        let color = Color32::BLACK;
-        let _ = painter.text(pos, align, title, font, color);
-    });
 
     // frame
     let _ = painter.rect_stroke(

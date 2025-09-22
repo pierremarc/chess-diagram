@@ -5,10 +5,12 @@ mod board;
 mod config;
 mod game;
 mod gesture;
+mod menu;
 mod promotion;
 mod proxy;
 mod side;
 mod sources;
+mod variation;
 
 static DEFAULT_SIZE: [f32; 2] = [800.0, 600.0];
 

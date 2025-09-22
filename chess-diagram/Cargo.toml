@@ -45,6 +45,7 @@ ucui-utils = { path = "../utils" }
 # You only need serde if you want app persistence:
 serde = { version = "1.0.219", features = ["derive"] }
 rand = "0.9.2"
+egui_flex = "0.4.0"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
