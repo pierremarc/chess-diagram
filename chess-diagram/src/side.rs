@@ -1,5 +1,5 @@
-use egui::{Color32, Context, CornerRadius, Response, RichText, Ui};
-use egui_flex::Flex;
+use egui::{Color32, Context, CornerRadius, Label, RichText, Separator, Ui};
+use egui_flex::{Flex, item};
 use shakmaty::{Color, Move, Position, san::San};
 use ucui_engine::Score;
 // use ucui_utils::ucimovelist_to_sanlist;
@@ -83,6 +83,13 @@ where
     base
 }
 
+fn move_none() -> (Text, Option<MoveIndex>) {
+    (
+        Text::new("…").color(Color32::BLACK), // .line_height(Some(MOVE_TEXT_LINE_HEIGHT))
+        None,
+    )
+}
+
 fn ord_text(depth: usize, ord: std::num::NonZeroU32) -> RichText {
     let rsize = 10.0 - depth as f32;
     let size = rsize * (MOVE_TEXT_LINE_HEIGHT * 0.8) / 10.0;
@@ -92,291 +99,270 @@ fn ord_text(depth: usize, ord: std::num::NonZeroU32) -> RichText {
         .line_height(Some(MOVE_TEXT_LINE_HEIGHT))
 }
 
-type MoveChunk<'a> = (Option<&'a Move>, Option<&'a Move>);
+type MoveChunk = (Option<Move>, Option<Move>);
 
-fn label(ui: &mut Ui, text: impl Into<egui::WidgetText>) -> Response {
-    let c0 = ui.cursor();
-    let aw = ui.available_width();
-    // ui.set_max_width(aw);
-    let text_widget = text.into();
-    let r = ui.label(text_widget.clone());
+type Text = RichText;
 
-    let c1 = ui.cursor();
-    log::info!(
-        "<{:?}> aw: {}, w {} tx {} ty {}",
-        text_widget.clone(),
-        aw,
-        r.rect.width(),
-        c1.min.x - c0.min.x,
-        c1.min.y - c0.min.y
-    );
-
-    r
+type PrintMove = (Text, Option<MoveIndex>);
+enum PrintUnit {
+    FullMove {
+        ord: Text,
+        white: PrintMove,
+        black: PrintMove,
+    },
+    VariationStart,
+    VariationEnd,
 }
 
-fn layout_moves<R>(is_main: bool, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
-    if is_main {
-        log::info!("layout_moves with layout");
-        ui.with_layout(egui::Layout::left_to_right(egui::Align::LEFT), add_contents);
-    } else {
-        log::info!("layout_moves *without* layout - {}", ui.available_width());
-        add_contents(ui);
-    }
+fn print_move(
+    ord: Text,
+    white: (Text, Option<MoveIndex>),
+    black: (Text, Option<MoveIndex>),
+) -> PrintUnit {
+    PrintUnit::FullMove { ord, white, black }
 }
 
-fn render_chunk<'a>(
-    ui: &mut Ui,
+fn print_variation_start() -> PrintUnit {
+    PrintUnit::VariationStart
+}
+
+fn print_variation_end() -> PrintUnit {
+    PrintUnit::VariationEnd
+}
+
+fn append_units(
+    units: &mut Vec<PrintUnit>,
     tree: &VariationTree,
-    chunk: MoveChunk<'a>,
+    chunk: MoveChunk,
     index: MoveIndex,
     depth: usize,
-) -> Option<MoveIndex> {
-    log::info!("render_chunk {:?}; {:?}", chunk, index);
-    let mut clicked_index: Option<MoveIndex> = None;
-    let is_main = depth == 0;
-    layout_moves(is_main, ui, |ui| {
-        match chunk {
-            (Some(white), Some(black)) => {
-                let game = tree.game_at(index).unwrap();
-                let white_variations = tree.variations_from(index);
-                let black_variations = tree.variations_from(index.incr_move());
-                if white_variations.is_empty() {
-                    // we print both moves
+) {
+    log::info!("make_unit {:?}; {:?}", chunk, index);
 
-                    label(ui, ord_text(depth, game.fullmoves()));
-                    if label(
-                        ui,
-                        move_text(
-                            depth,
-                            tree.is_current(index),
-                            San::from_move(&game, white).to_string(),
+    let game = tree.game_at(index).unwrap();
+    let ord = ord_text(depth, game.fullmoves());
+    let white_variations = tree.variations_from(index);
+    let black_variations = tree.variations_from(index.incr_move());
+
+    match chunk {
+        (Some(white), Some(black)) => {
+            if white_variations.is_empty() {
+                // we print both moves
+                if let Ok(game) = game.play(&black) {
+                    units.push(print_move(
+                        ord,
+                        (
+                            move_text(
+                                depth,
+                                tree.is_current(index),
+                                San::from_move(&game, &white).to_string(),
+                            ),
+                            Some(index),
                         ),
-                    )
-                    .clicked()
-                    {
-                        clicked_index = Some(index);
-                    };
-
-                    if let Ok(game) = game.play(black) {
-                        if label(
-                            ui,
+                        (
                             move_text(
                                 depth,
                                 tree.is_current(index.incr_move()),
-                                San::from_move(&game, black).to_string(),
+                                San::from_move(&game, &black).to_string(),
                             ),
-                        )
-                        .clicked()
-                        {
-                            clicked_index = Some(index.incr_move());
-                        };
-                    }
-                } else {
-                    // print white move, then white variations, then black move
-                    // layout_moves(is_main, ui, |ui| {
-                    label(ui, ord_text(depth, game.fullmoves()));
-                    if label(
-                        ui,
-                        move_text(
-                            depth,
-                            tree.is_current(index),
-                            San::from_move(&game, white).to_string(),
+                            Some(index.incr_move()),
                         ),
-                    )
-                    .clicked()
-                    {
-                        clicked_index = Some(index);
-                    };
-                    label(ui, move_text(depth, false, format!("…")));
-                    // });
-                    for var in white_variations {
-                        let clicked = render_variation(ui, tree, depth + 1, var);
-                        if clicked_index.is_none() {
-                            clicked_index = clicked;
-                        }
-                    }
-                    // layout_moves(is_main, ui, |ui| {
-                    label(ui, ord_text(depth, game.fullmoves()));
-                    label(ui, move_text(depth, false, format!("…")));
-
-                    if let Ok(game) = game.play(black) {
-                        if label(
-                            ui,
-                            move_text(
-                                depth,
-                                tree.is_current(index.incr_move()),
-                                San::from_move(&game, black).to_string(),
-                            ),
-                        )
-                        .clicked()
-                        {
-                            clicked_index = Some(index.incr_move());
-                        };
-                    }
-                    // });
+                    ));
                 }
-                for var in black_variations {
-                    let clicked = render_variation(ui, tree, depth + 1, var);
-                    if clicked_index.is_none() {
-                        clicked_index = clicked;
-                    }
+            } else {
+                // print white move, then white variations, then black move
+                units.push(print_move(
+                    ord.clone(),
+                    (
+                        move_text(
+                            depth,
+                            tree.is_current(index),
+                            San::from_move(&game, &white).to_string(),
+                        ),
+                        Some(index),
+                    ),
+                    move_none(),
+                ));
+
+                for var in white_variations {
+                    render_variation(units, tree, depth + 1, var);
+                }
+
+                if let Ok(game) = game.play(&black) {
+                    units.push(print_move(
+                        ord,
+                        move_none(),
+                        (
+                            move_text(
+                                depth,
+                                tree.is_current(index.incr_move()),
+                                San::from_move(&game, &black).to_string(),
+                            ),
+                            Some(index.incr_move()),
+                        ),
+                    ));
                 }
             }
-            (Some(white), None) => {
-                let game = tree.game_at(index).unwrap();
-                let white_variations = tree.variations_from(index);
-                // layout_moves(is_main, ui, |ui| {
-                label(ui, ord_text(depth, game.fullmoves()));
-                if label(
-                    ui,
+
+            for var in black_variations {
+                render_variation(units, tree, depth + 1, var);
+            }
+        }
+        (Some(white), None) => {
+            units.push(print_move(
+                ord,
+                (
                     move_text(
                         depth,
                         tree.is_current(index),
-                        San::from_move(&game, white).to_string(),
+                        San::from_move(&game, &white).to_string(),
                     ),
-                )
-                .clicked()
-                {
-                    clicked_index = Some(index);
-                };
-                label(ui, move_text(depth, false, format!("…")));
-                // });
-                for var in white_variations {
-                    let clicked = render_variation(ui, tree, depth + 1, var);
-                    if clicked_index.is_none() {
-                        clicked_index = clicked;
-                    }
-                }
-            }
-            (None, Some(black)) => {
-                let game = tree.game_at(index).unwrap();
-                let black_variations = tree.variations_from(index.incr_move());
-                // layout_moves(is_main, ui, |ui| {
-                label(ui, ord_text(depth, game.fullmoves()));
-                label(ui, move_text(depth, false, format!("…")));
+                    Some(index),
+                ),
+                move_none(),
+            ));
 
-                if let Ok(game) = game.play(black) {
-                    if label(
-                        ui,
+            for var in white_variations {
+                render_variation(units, tree, depth + 1, var);
+            }
+        }
+        (None, Some(black)) => {
+            if let Ok(game) = game.play(&black) {
+                units.push(print_move(
+                    ord,
+                    move_none(),
+                    (
                         move_text(
                             depth,
                             tree.is_current(index.incr_move()),
-                            San::from_move(&game, black).to_string(),
+                            San::from_move(&game, &black).to_string(),
                         ),
-                    )
-                    .clicked()
-                    {
-                        clicked_index = Some(index.incr_move());
-                    };
-                }
-                // });
-                for var in black_variations {
-                    let clicked = render_variation(ui, tree, depth + 1, var);
-                    if clicked_index.is_none() {
-                        clicked_index = clicked;
-                    }
-                }
+                        Some(index.incr_move()),
+                    ),
+                ));
             }
-            (None, None) => {}
+
+            for var in black_variations {
+                render_variation(units, tree, depth + 1, var);
+            }
         }
-    });
-    clicked_index
+        (None, None) => {}
+    }
 }
 
 fn render_variation(
-    ui: &mut Ui,
+    units: &mut Vec<PrintUnit>,
     tree: &VariationTree,
     depth: usize,
     var: Variation,
-) -> Option<MoveIndex> {
-    // assert!(depth < 10, "bad recursion");
-    // ui.separator();
-
-    let mut index = var.index;
-
-    if tree.is_current_variation(index) {
-        ui.style_mut().visuals.faint_bg_color = Color32::GRAY; // FIXME
-    }
-
+) {
+    let index = var.index;
     let turn = var.game(index.move_index()).turn();
     log::info!("render_variation {} {:?} {}", depth, index, turn);
 
+    units.push(print_variation_start());
+
     let (first_chunk, remaining_moves) = if turn == Color::Black {
         // it looks weird, but the cursor is *on* the move
-        ((var.moves.get(0), var.moves.get(1)), var.moves.get(2..))
+        (
+            (var.moves.get(0).cloned(), var.moves.get(1).cloned()),
+            var.moves
+                .get(2..)
+                .map(|m| m.iter().map(|m| m.clone()).collect::<Vec<_>>()),
+        )
     } else {
-        ((None, var.moves.get(0)), var.moves.get(1..))
+        (
+            (None, var.moves.get(0).cloned()),
+            var.moves
+                .get(1..)
+                .map(|m| m.iter().map(|m| m.clone()).collect::<Vec<_>>()),
+        )
     };
 
-    let mut clicked_index: Option<MoveIndex> = None;
-    ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
-        *(&mut clicked_index) = render_chunk(ui, tree, first_chunk, index, depth);
+    append_units(units, tree, first_chunk, index, depth);
+    if let Some(remaining_moves) = remaining_moves {
+        for chunk in remaining_moves.chunks(2) {
+            append_units(
+                units,
+                tree,
+                (chunk.get(0).cloned(), chunk.get(1).cloned()),
+                index.incr_move().incr_move(),
+                depth,
+            );
+        }
+    }
 
-        if let Some(remaining_moves) = remaining_moves {
-            for chunk in remaining_moves.chunks(2) {
-                index = index.incr_move().incr_move();
+    units.push(print_variation_end());
+}
 
-                let mut clicked = None;
-                ui.horizontal_wrapped(|ui| {
-                    log::info!(
-                        "Horizotal {} {} ",
-                        ui.available_size(),
-                        ui.available_size_before_wrap()
+fn render_chunk<'a>(
+    state: &mut GameState,
+    container: &mut egui_flex::FlexInstance<'a>,
+    (ord, (white_move, white_index), (black_move, black_index)): (Text, PrintMove, PrintMove),
+) {
+    container.add(item(), Label::new(ord));
+    if container.add(item(), Label::new(white_move)).clicked() {
+        white_index.map(|i| state.at(i));
+    }
+    if container.add(item(), Label::new(black_move)).clicked() {
+        black_index.map(|i| state.at(i));
+    }
+}
+
+fn drain_units<'a>(
+    state: &mut GameState,
+    root: &mut egui_flex::FlexInstance<'a>,
+    accum: &mut Vec<(Text, PrintMove, PrintMove)>,
+    current_depth: usize,
+) {
+    if !accum.is_empty() {
+        let sub_flex = if current_depth > 0 {
+            Flex::horizontal().wrap(true)
+            // Flex::vertical()
+        } else {
+            Flex::vertical()
+        };
+        root.add_flex(item(), Flex::vertical(), |container| {
+            container.add_flex(item(), sub_flex, |container| {
+                for (ord, (white_move, white_index), (black_move, black_index)) in
+                    accum.clone().into_iter()
+                {
+                    render_chunk(
+                        state,
+                        container,
+                        (ord, (white_move, white_index), (black_move, black_index)),
                     );
-                    *(&mut clicked) =
-                        render_chunk(ui, tree, (chunk.get(0), chunk.get(1)), index, depth);
-                });
+                }
+            });
+        });
+        accum.clear();
+    }
+}
 
-                if clicked_index.is_none() {
-                    clicked_index = clicked;
+fn render_root_variation(state: &mut GameState, ui: &mut Ui, var: Variation) {
+    let mut units: Vec<PrintUnit> = Vec::new();
+    render_variation(&mut units, &state.tree, 0, var);
+
+    Flex::vertical().show(ui, |container| {
+        let mut current_depth = 0;
+        let mut accum: Vec<(Text, PrintMove, PrintMove)> = Vec::new();
+        let accum_ref = &mut accum;
+
+        for unit in units {
+            match unit {
+                PrintUnit::VariationStart => {
+                    current_depth += 1;
+                }
+                PrintUnit::VariationEnd => {
+                    drain_units(state, container, accum_ref, current_depth);
+                    current_depth -= 1;
+                }
+                PrintUnit::FullMove { ord, white, black } => {
+                    accum_ref.push((ord, white, black));
                 }
             }
         }
     });
-
-    // ui.separator();
-    clicked_index
-}
-
-fn render_root_variation(
-    ui: &mut Ui,
-    tree: &VariationTree,
-    depth: usize,
-    var: Variation,
-) -> Option<MoveIndex> {
-    ui.separator();
-
-    let mut index = var.index;
-
-    if tree.is_current_variation(index) {
-        ui.style_mut().visuals.faint_bg_color = Color32::GRAY; // FIXME
-    }
-
-    let turn = var.game(index.move_index()).turn();
-    log::info!("render_variation {} {:?} {}", depth, index, turn);
-
-    let (first_chunk, remaining_moves) = if turn == Color::Black {
-        // it looks weird, but the cursor is *on* the move
-        ((var.moves.get(0), var.moves.get(1)), var.moves.get(2..))
-    } else {
-        ((None, var.moves.get(0)), var.moves.get(1..))
-    };
-
-    let mut clicked_index: Option<MoveIndex> = render_chunk(ui, tree, first_chunk, index, depth);
-
-    if let Some(remaining_moves) = remaining_moves {
-        for chunk in remaining_moves.chunks(2) {
-            index = index.incr_move().incr_move();
-            let clicked = render_chunk(ui, tree, (chunk.get(0), chunk.get(1)), index, depth);
-
-            if clicked_index.is_none() {
-                clicked_index = clicked;
-            }
-        }
-    }
-
-    ui.separator();
-    clicked_index
 }
 
 pub fn render_game_side(ctx: &Context, ui: &mut Ui, state: &mut GameState) {
@@ -397,9 +383,7 @@ pub fn render_game_side(ctx: &Context, ui: &mut Ui, state: &mut GameState) {
     log::info!("start variations");
 
     if let Some(root) = state.tree.root_variation() {
-        if let Some(move_index) = render_root_variation(ui, &mut state.tree, 0, root) {
-            state.at(move_index);
-        }
+        render_root_variation(state, ui, root);
     }
 }
 
