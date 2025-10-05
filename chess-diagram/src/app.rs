@@ -6,7 +6,7 @@ use egui::Key;
 use egui_extras::install_image_loaders;
 use log::info;
 use shakmaty::fen::Fen;
-use shakmaty::{Move, Position};
+use shakmaty::{Chess, Move, Position};
 
 use crate::board::{render_board, square_at};
 use crate::config::get_engine_color;
@@ -365,6 +365,35 @@ impl<'a> eframe::App for DiagramApp<'a> {
 
                     if input.key_released(Key::I) {
                         self.toggle_pointer_mode();
+                    }
+
+                    if input.key_released(Key::L) {
+                        let game_state = self.game.read().unwrap();
+                        let mut game = Chess::new();
+                        for (i, moves) in game_state.tree.moves().chunks(2).enumerate() {
+                            match (moves.get(0), moves.get(1)) {
+                                (Some(w), Some(b)) => {
+                                    let ws = shakmaty::san::San::from_move(&game, w).to_string();
+                                    if let Ok(new_game) = game.clone().play(w) {
+                                        game = new_game;
+                                    }
+
+                                    let bs = shakmaty::san::San::from_move(&game, b).to_string();
+
+                                    if let Ok(new_game) = game.clone().play(b) {
+                                        game = new_game;
+                                    }
+
+                                    println!("{}. {} {}", i + 1, ws, bs);
+                                }
+                                (Some(w), None) => {
+                                    let ws = shakmaty::san::San::from_move(&game, w).to_string();
+
+                                    println!("{}. {} ...", i + 1, ws);
+                                }
+                                _ => {}
+                            }
+                        }
                     }
                 });
 

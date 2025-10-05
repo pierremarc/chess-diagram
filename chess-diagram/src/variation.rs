@@ -254,16 +254,16 @@ impl VariationTree {
                  }| {
                     log::info!("moves {var_index} {move_index}");
 
-                    let mut var = &self.variations[var_index];
-                    let mut chunks = vec![&var.moves[0..move_index]];
+                    let mut variation = &self.variations[var_index];
+                    let mut chunks = vec![&variation.moves[0..move_index]];
                     let mut it = 0;
                     loop {
                         assert!(it < 1200, "looping a tad too much, me think");
-                        chunks.push(&var.moves);
 
-                        if let Some(from) = var.from {
+                        if let Some(from) = variation.from {
                             log::info!("from {}", from.var_index);
-                            var = &self.variations[from.var_index];
+                            variation = &self.variations[from.var_index];
+                            chunks.push(&variation.moves);
                         } else {
                             break;
                         }

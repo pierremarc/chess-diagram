@@ -1,11 +1,14 @@
-use egui::{Color32, Context, CornerRadius, Label, RichText, Separator, Ui};
-use egui_flex::{Flex, item};
+use egui::{Color32, Context, CornerRadius, Label, RichText, Ui};
 use shakmaty::{Color, Move, Position, san::San};
 use ucui_engine::Score;
 // use ucui_utils::ucimovelist_to_sanlist;
 
 use crate::{
     game::GameState,
+    layout::{
+        ScoreSheet, ScoreSheetMove, end_variation, main_variation_move, start_variation,
+        variation_move,
+    },
     variation::{MoveIndex, Variation, VariationTree},
 };
 
@@ -103,12 +106,11 @@ type MoveChunk = (Option<Move>, Option<Move>);
 
 type Text = RichText;
 
-type PrintMove = (Text, Option<MoveIndex>);
 enum PrintUnit {
     FullMove {
         ord: Text,
-        white: PrintMove,
-        black: PrintMove,
+        white: ScoreSheetMove,
+        black: ScoreSheetMove,
     },
     VariationStart,
     VariationEnd,
@@ -119,7 +121,11 @@ fn print_move(
     white: (Text, Option<MoveIndex>),
     black: (Text, Option<MoveIndex>),
 ) -> PrintUnit {
-    PrintUnit::FullMove { ord, white, black }
+    PrintUnit::FullMove {
+        ord,
+        white: white.into(),
+        black: black.into(),
+    }
 }
 
 fn print_variation_start() -> PrintUnit {
@@ -295,74 +301,100 @@ fn render_variation(
     units.push(print_variation_end());
 }
 
-fn render_chunk<'a>(
-    state: &mut GameState,
-    container: &mut egui_flex::FlexInstance<'a>,
-    (ord, (white_move, white_index), (black_move, black_index)): (Text, PrintMove, PrintMove),
-) {
-    container.add(item(), Label::new(ord));
-    if container.add(item(), Label::new(white_move)).clicked() {
-        white_index.map(|i| state.at(i));
-    }
-    if container.add(item(), Label::new(black_move)).clicked() {
-        black_index.map(|i| state.at(i));
-    }
-}
+// fn render_chunk<'a>(
+//     state: &mut GameState,
+//     container: &mut egui_flex::FlexInstance<'a>,
+//     (ord, (white_move, white_index), (black_move, black_index)): (Text, PrintMove, PrintMove),
+// ) {
+//     container.add(item(), Label::new(ord));
+//     if container.add(item(), Label::new(white_move)).clicked() {
+//         white_index.map(|i| state.at(i));
+//     }
+//     if container.add(item(), Label::new(black_move)).clicked() {
+//         black_index.map(|i| state.at(i));
+//     }
+// }
 
-fn drain_units<'a>(
-    state: &mut GameState,
-    root: &mut egui_flex::FlexInstance<'a>,
-    accum: &mut Vec<(Text, PrintMove, PrintMove)>,
-    current_depth: usize,
-) {
-    if !accum.is_empty() {
-        let sub_flex = if current_depth > 0 {
-            Flex::horizontal().wrap(true)
-            // Flex::vertical()
-        } else {
-            Flex::vertical()
-        };
-        root.add_flex(item(), Flex::vertical(), |container| {
-            container.add_flex(item(), sub_flex, |container| {
-                for (ord, (white_move, white_index), (black_move, black_index)) in
-                    accum.clone().into_iter()
-                {
-                    render_chunk(
-                        state,
-                        container,
-                        (ord, (white_move, white_index), (black_move, black_index)),
-                    );
-                }
-            });
-        });
-        accum.clear();
-    }
-}
+// fn drain_units(
+//     state: &mut GameState,
+//     root: &mut Ui,
+//     accum: &mut Vec<(Text, PrintMove, PrintMove)>,
+//     current_depth: usize,
+// ) {
+//     if !accum.is_empty() {
+//         let sub_flex = if current_depth > 0 {
+//             Flex::horizontal().wrap(true)
+//             // Flex::vertical()
+//         } else {
+//             Flex::vertical()
+//         };
+//         root.add_flex(item(), Flex::vertical(), |container| {
+//             container.add_flex(item(), sub_flex, |container| {
+//                 for (ord, (white_move, white_index), (black_move, black_index)) in
+//                     accum.clone().into_iter()
+//                 {
+//                     render_chunk(
+//                         state,
+//                         container,
+//                         (ord, (white_move, white_index), (black_move, black_index)),
+//                     );
+//                 }
+//             });
+//         });
+//         accum.clear();
+//     }
+// }
 
 fn render_root_variation(state: &mut GameState, ui: &mut Ui, var: Variation) {
     let mut units: Vec<PrintUnit> = Vec::new();
     render_variation(&mut units, &state.tree, 0, var);
 
-    Flex::vertical().show(ui, |container| {
-        let mut current_depth = 0;
-        let mut accum: Vec<(Text, PrintMove, PrintMove)> = Vec::new();
-        let accum_ref = &mut accum;
+    let mut score_sheet = ScoreSheet::new(ui.max_rect());
+    let mut current_depth = 0;
+    for unit in units {
+        match unit {
+            PrintUnit::VariationStart => {
+                current_depth += 1;
+                let _ = score_sheet.push_item(ui, start_variation());
+            }
+            PrintUnit::VariationEnd => {
+                current_depth -= 1;
+                let _ = score_sheet.push_item(ui, end_variation());
+            }
+            PrintUnit::FullMove { ord, white, black } => {
+                let opt_index = if current_depth > 1 {
+                    score_sheet.push_item(ui, variation_move(ord, white, black))
+                } else {
+                    score_sheet.push_item(ui, main_variation_move(ord, white, black))
+                };
 
-        for unit in units {
-            match unit {
-                PrintUnit::VariationStart => {
-                    current_depth += 1;
-                }
-                PrintUnit::VariationEnd => {
-                    drain_units(state, container, accum_ref, current_depth);
-                    current_depth -= 1;
-                }
-                PrintUnit::FullMove { ord, white, black } => {
-                    accum_ref.push((ord, white, black));
+                if let Some(index) = opt_index {
+                    state.at(index);
                 }
             }
         }
-    });
+    }
+
+    // Flex::vertical().show(ui, |container| {
+    //     let mut current_depth = 0;
+    //     let mut accum: Vec<(Text, PrintMove, PrintMove)> = Vec::new();
+    //     let accum_ref = &mut accum;
+
+    //     for unit in units {
+    //         match unit {
+    //             PrintUnit::VariationStart => {
+    //                 current_depth += 1;
+    //             }
+    //             PrintUnit::VariationEnd => {
+    //                 drain_units(state, container, accum_ref, current_depth);
+    //                 current_depth -= 1;
+    //             }
+    //             PrintUnit::FullMove { ord, white, black } => {
+    //                 accum_ref.push((ord, white, black));
+    //             }
+    //         }
+    //     }
+    // });
 }
 
 pub fn render_game_side(ctx: &Context, ui: &mut Ui, state: &mut GameState) {
